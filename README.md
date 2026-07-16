@@ -36,7 +36,7 @@ For a detailed breakdown of the internal workflows, the adversarial red teaming 
 *   **API Keys** - Required for LLM inference and metadata validation.
 
 ### 1. Configuration
-Open `src/main/resources/application.properties` and provide your API keys:
+Rename the template file `src/main/resources/application-template.properties` to `application.properties` and provide your API keys:
 
 *   **Google Gemini:** Panoptes requires access to Google's Gemini models. Obtain your API keys at [Google AI Studio](https://aistudio.google.com/app/apikey). You can provide multiple keys separated by commas; the system automatically rotates them to mitigate rate limits.
     ```properties
