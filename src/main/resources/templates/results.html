@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results | Panoptes</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/themes/base.css">
+    <link rel="stylesheet" href="/css/themes/dark.css">
+    <link rel="stylesheet" href="/css/themes/light.css">
+    <link rel="stylesheet" href="/css/themes/midnight.css">
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/shift-away.css"/>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    
+    <!-- Apply theme before rendering to prevent FOUC -->
+    <script>
+        (function() {
+            let theme = localStorage.getItem('ideenatlas-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+<body>
+    <main class="app-container" id="app-main" th:data-report-title="${reportTitle}">
+        
+        <header class="app-header">
+            <h1 class="brand-title">
+                <!-- Direct link styling removed from HTML, added utility class -->
+                <a th:href="@{/}" class="brand-link">
+                    <i class="fa-solid fa-eye"></i> Panoptes
+                </a>
+            </h1>
+            <p class="brand-subtitle" th:text="${reportTitle}"></p>
+        </header>
+
+        <section class="phase-container is-active">
+            <div class="processing-card">
+
+                <textarea id="raw-markdown" class="hidden-data" th:text="${markdownData}"></textarea>
+
+                <div id="content-output" class="markdown-body"></div>
+
+                <hr class="print-hidden results-divider">
+
+                <!-- The print-hidden class ensures buttons don't show up in the exported PDF -->
+                <div class="print-hidden results-controls">
+                    <span class="task-id-label">
+                        Task ID: <span th:text="${resultId}"></span>
+                    </span>
+                    <div class="control-group">
+                        <button id="btn-download-pdf" class="go-btn secondary-btn">
+                            <i class="fa-solid fa-file-pdf"></i> Save PDF
+                        </button>
+                        <a href="/" class="go-btn inline-flex-btn"> 
+                            <i class="fa-solid fa-rotate-left"></i> New Query
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="/js/results.js"></script>
+</body>
+</html>

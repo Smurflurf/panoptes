@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 1. Ausgabe in der IDE Console -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 2. SiftingAppender: Standard Log wandert jetzt in den Result-Ordner! -->
+    <appender name="SIFT-INFO" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator>
+            <key>jobId</key>
+            <!-- System-Logs landen in results/system/ -->
+            <defaultValue>system</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="FILE-${jobId}" class="ch.qos.logback.core.FileAppender">
+                <!-- Pfad geändert: results/{jobId}/ -->
+                <file>results/${jobId}/execution.log</file>
+                <append>true</append>
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <!-- 3. SiftingAppender: NUR ERRORS -->
+    <appender name="SIFT-ERROR" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator>
+            <key>jobId</key>
+            <defaultValue>system</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="ERROR-FILE-${jobId}" class="ch.qos.logback.core.FileAppender">
+                <!-- Pfad geändert: results/{jobId}/ -->
+                <file>results/${jobId}/error.log</file>
+                <append>true</append>
+                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                    <level>ERROR</level>
+                </filter>
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="SIFT-INFO" />
+        <appender-ref ref="SIFT-ERROR" />
+    </root>
+
+    <logger name="panoptes.llm" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="SIFT-INFO" />
+        <appender-ref ref="SIFT-ERROR" />
+    </logger>
+</configuration>

@@ -1,0 +1,139 @@
+/* ==========================================
+   NATIVE PDF EXPORT (PRINT HACK)
+   ========================================== */
+@media print {
+    /* Real, printer-calculated page margins */
+    @page { 
+        margin: 2cm; 
+    }
+
+    /* Disable flexbox, min-height, and overflow strictly! */
+    html, body { 
+        display: block !important; 
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important; 
+        color: #000 !important; 
+        padding: 0 !important; 
+        margin: 0 !important;
+    }
+
+    .print-hidden { 
+        display: none !important; 
+    }
+
+    /* Convert all UI containers to normal block elements */
+    .app-container, .phase-container, .processing-card {
+        display: block !important; 
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+
+    /* Font sizes optimized for relaxed reading */
+    .markdown-body {
+        font-size: 10pt !important;
+        line-height: 1.5 !important;
+        color: #000 !important;
+    }
+    
+    .meta-yes { color: #16a34a !important; font-weight: bold !important; text-decoration: none !important; }
+    .meta-no { color: #dc2626 !important; font-weight: bold !important; text-decoration: none !important; }
+
+    .markdown-body blockquote {
+        border-left: 2px solid #ccc !important;
+        background-color: transparent !important;
+        color: #333 !important;
+        padding-left: 15px !important;
+    }
+
+    /* Prevent headings or lists from being torn across pages */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+        color: #000 !important;
+        border-bottom: 1px solid #ccc !important;
+        margin-top: 24pt !important;
+    }
+
+    .markdown-body li, .markdown-body blockquote {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .markdown-body a {
+        color: #0056b3 !important;
+        text-decoration: none !important;
+    }
+
+    .citation-link {
+        border: 1px solid #ccc !important;
+        background: #f1f3f5 !important;
+        color: #000 !important;
+        padding: 2px 4px !important;
+        border-radius: 4px !important;
+        text-decoration: none !important;
+    }
+
+    /* Fix for ASCII art and Code blocks in PDF */
+    .markdown-body pre {
+        background-color: #f8f9fa !important;
+        border: 1px solid #ccc !important;
+        padding: 10pt !important;
+        
+        /* Drastically scale down in PDF so graphs fit on A4 */
+        font-size: 7.5pt !important;
+        
+        /* Prevents wide code blocks from stretching the PDF page horizontally */
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        
+        /* If it absolutely doesn't fit, force the browser to wrap (scrolling isn't possible on paper) */
+        white-space: pre-wrap !important;
+        word-break: break-all !important;
+    }
+
+    .app-header {
+        display: block !important;
+        text-align: center !important;
+        margin-bottom: 2cm !important;
+        border-bottom: 2px solid #000 !important;
+        padding-bottom: 10pt !important;
+    }
+
+    .app-header .brand-title {
+        font-size: 24pt !important;
+        color: #000 !important;
+        margin: 0 !important;
+    }
+
+    .app-header .brand-subtitle {
+        font-size: 14pt !important;
+        color: #555 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 2px !important;
+        margin-top: 5pt !important;
+    }
+
+    /* Keep TL;DR box clean for printing */
+    .tldr-box {
+        background-color: #f8f9fa !important;
+        border: 1px solid #ccc !important;
+        padding: 15pt !important;
+        border-radius: 8px !important;
+        font-size: 12pt !important;
+        box-shadow: none !important;
+        margin-bottom: 24pt !important;
+        page-break-inside: avoid !important;
+    }
+
+    .tldr-box strong {
+        color: #000 !important;
+    }
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing | Panoptes</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <link rel="stylesheet" href="/css/themes/base.css">
+    <link rel="stylesheet" href="/css/themes/dark.css">
+    <link rel="stylesheet" href="/css/themes/light.css">
+    <link rel="stylesheet" href="/css/themes/midnight.css">
+    <link rel="stylesheet" href="/css/style.css">
+
+    <!-- Apply theme before rendering to prevent FOUC -->
+    <script>
+        (function() {
+            let theme = localStorage.getItem('ideenatlas-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+<body>
+
+    <main class="app-container" id="status-main" th:data-job-id="${jobId}">
+        <header class="app-header">
+            <h1 class="brand-title"><i class="fa-solid fa-eye"></i> Panoptes</h1>
+            <p class="brand-subtitle">Task ID: <span th:text="${jobId}"></span></p>
+        </header>
+
+        <section class="phase-container is-active">
+            <div class="processing-card">
+                
+                <div id="api-delay-banner" class="api-warning-banner hidden-data">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span class="warning-text">
+                        High demand on Gemini API. Cloud requests rejected & retried: <strong id="api-retry-count">0</strong>. This might take a while...
+                    </span>
+                    <button id="close-api-banner" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="status-header">
+                    <i class="fa-solid fa-circle-notch fa-spin status-spinner"></i>
+                    <h2 id="live-status-title">Agent deployed...</h2>
+                </div>
+                <div class="status-console" id="sse-console">
+                    <!-- Logs injected via JS -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/js/status.js"></script>
+</body>
+</html>

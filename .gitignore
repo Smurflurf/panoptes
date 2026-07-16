@@ -1,0 +1,25 @@
+# IDE specific files (Eclipse)
+.metadata
+.classpath
+.project
+.settings/
+
+# IntelliJ / VSCode (just in case other devs use it)
+.idea/
+*.iml
+.vscode/
+
+# Maven build output
+target/
+
+# Panoptes specific runtime data
+logs/
+results/
+
+# Private python scripts
+*.py
+__pycache__/
+
+# OS generated files
+.DS_Store
+Thumbs.db

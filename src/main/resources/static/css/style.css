@@ -1,0 +1,17 @@
+/* ==========================================
+   PANOPTES CENTRAL STYLESHEET
+   ========================================== */
+
+/* 1. Global Layout & Structure */
+@import url('modules/layout.css');
+
+/* 2. Reusable UI Components (Buttons, Utilities) */
+@import url('modules/components.css');
+
+/* 3. Specific Phase Styles */
+@import url('modules/input-phase.css');
+@import url('modules/processing-phase.css');
+@import url('modules/results-phase.css');
+
+/* 4. PDF Export & Print Overrides */
+@import url('modules/print.css');

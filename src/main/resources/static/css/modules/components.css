@@ -1,0 +1,79 @@
+/* ==========================================
+   REUSABLE COMPONENTS & UTILITIES
+   ========================================== */
+
+/* Utilities */
+.hidden-data {
+    display: none !important;
+}
+
+.control-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-group {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Buttons */
+.icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    position: relative;
+}
+
+.icon-btn:hover {
+    background-color: var(--bg-element-hover);
+    color: var(--text-primary);
+}
+
+.go-btn {
+    background-color: var(--color-primary);
+    color: var(--text-on-accent);
+    border: none;
+    padding: 10px 24px;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s, opacity 0.2s;
+    z-index: 10;
+    position: relative;
+}
+
+.go-btn:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+}
+
+.go-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--bg-element);
+    color: var(--text-quaternary);
+}
+
+.secondary-btn {
+    background-color: var(--bg-element);
+    color: var(--text-primary);
+}
+
+.inline-flex-btn {
+    display: inline-flex;
+}
