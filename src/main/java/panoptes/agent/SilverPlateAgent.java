@@ -39,11 +39,10 @@ public class SilverPlateAgent extends AbstractAgent {
                 5. CROSS-CHAPTER REASONING: Actively look for hidden connections between different sections of the report. If Chapter A describes a hardware solution for biology, and Chapter B describes a similar hardware solution for NLP, synthesize this as a key finding!
                 6. CITATIONS: If you make claims in your answer, you MUST reuse the exact XML `<cite id="..." quote="...">` tags found in the report. Do NOT invent new citations.
                 7. GRAMMAR & INLINE CITATIONS: Write complete, grammatically correct sentences! Do NOT use the <cite> tag as a replacement for a noun, verb, or phrase. Place the <cite> tag IMMEDIATELY after the specific claim, fact, or metric it supports, even if this is in the middle of a sentence. Do NOT cluster multiple citations at the very end of a long sentence if they support different parts of it.
-                8. READ THE HIDDEN METADATA: The citations in the text contain hidden attributes (e.g., year="2023" peer_reviewed="NO"). Use this internally to evaluate the strength of a claim. Do NOT place sensational numbers (e.g., "98% of traffic") prominently in your answer IF the citation metadata reveals it comes from a low-citation preprint, unless you explicitly state this caveat!
+                8. EPISTEMIC HUMILITY & HIDDEN METADATA (CRITICAL): The citations in the text contain hidden attributes (e.g., year="2023" peer_reviewed="NO" citations="0"). You MUST use these internally to evaluate the strength of a claim. NEVER state that a concept is "scientifically validated" or "proven" if the underlying evidence relies on 0-citation preprints or purely theoretical simulations! Explicitly differentiate between high-tier evidence (highly cited, peer-reviewed) and low-tier evidence (unverified preprints, speculative hypotheses). Use cautious framing like "simulations suggest" or "unverified models propose" for the latter. Do NOT place sensational numbers prominently in your answer if they come from weak sources!
                 """);
         this.mapper = mapper;
     }
-    
     public SilverResult deliverAnswer(String userQuestion, String finalReport, String language) {
         String prompt = "--- USER'S ORIGINAL RESEARCH QUESTION ---\n" + userQuestion + 
                         "\n\n--- FINAL VALIDATED REPORT ---\n" + finalReport +
