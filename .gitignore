@@ -23,3 +23,6 @@ __pycache__/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# private parts
+src/main/resources/application.properties

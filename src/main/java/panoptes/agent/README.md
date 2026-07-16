@@ -62,4 +62,3 @@ This document outlines the distinct phases of the research pipeline and the resp
 
 1.  **`SilverPlateAgent`**: Compares the user's original query against the final, red-teamed report. It formulates a direct, objective "Executive Answer", ensuring that both the main findings and the most devastating methodological limitations are highlighted.
 2.  **`TldrAgent`**: Condenses the executive answer into a punchy 1-2 sentence TL;DR and generates a short title for the UI.
-```
