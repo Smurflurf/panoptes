@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import panoptes.agent.CitationQaAgent;
+import panoptes.agent.LogicalFallacyQaAgent;
 import panoptes.agent.RevisionAgent;
 import panoptes.dto.ResearchContext;
 import panoptes.dto.ValidatedResult;
@@ -21,11 +22,12 @@ import panoptes.web.SseService;
 /**
  * The orchestration layer dedicated to Quality Assurance (QA) and hallucination prevention.
  * <p>
- * This service enforces Panoptes' strict epistemic standards. It parses drafted sections, 
- * extracts all referenced paper IDs, and performs a ruthless two-step verification:
+ * This service enforces Panoptes' strict epistemic standards by deploying a "Panel of Auditors".
+ * It parses drafted sections, extracts all referenced paper IDs, and performs a ruthless verification process:
  * <ol>
  *   <li><b>Hard Java Check:</b> Verifies if the referenced ID actually exists in the local paper database. If it is fabricated, the claim instantly fails.</li>
- *   <li><b>LLM Verification:</b> Dispatches valid sources to the {@link panoptes.agent.CitationQaAgent} to ensure the drafted claim matches the original paper's abstract without conceptual shifting or category errors.</li>
+ *   <li><b>Citation Fidelity:</b> Dispatches sources to the {@link panoptes.agent.CitationQaAgent} to ensure the drafted claim matches the original abstract without cherry-picking or concept shifting.</li>
+ *   <li><b>Logical & Scale Audit:</b> Dispatches sources to the {@link panoptes.agent.LogicalFallacyQaAgent} to detect false equivalences, mismatched physical units, and scale conflations (e.g., evolution vs. real-time behavior).</li>
  * </ol>
  * If a section fails QA, this orchestrator automatically triggers the {@link panoptes.agent.RevisionAgent} 
  * to rewrite the text and logs the exact failure reasons to the filesystem for transparency.
@@ -36,40 +38,38 @@ public class QaOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(QaOrchestrator.class);
     
-    private final CitationQaAgent qaAgent;
+    private final CitationQaAgent citationQaAgent;
+    private final LogicalFallacyQaAgent logicQaAgent;
     private final RevisionAgent revisionAgent;
     private final JobService jobService;
     private final SseService sseService;
 
-    public QaOrchestrator(CitationQaAgent qaAgent, RevisionAgent revisionAgent, JobService jobService, SseService sseService) {
-        this.qaAgent = qaAgent;
+    public QaOrchestrator(CitationQaAgent citationQaAgent, LogicalFallacyQaAgent logicQaAgent, 
+                          RevisionAgent revisionAgent, JobService jobService, SseService sseService) {
+        this.citationQaAgent = citationQaAgent;
+        this.logicQaAgent = logicQaAgent;
         this.revisionAgent = revisionAgent;
         this.jobService = jobService;
         this.sseService = sseService;
     }
 
     public String performSectionQa(ResearchContext context, String sectionTitle, String sectionContent) {
-        sseService.sendUpdate(context.getJobId(), "QA Check: Verifying citations for " + sectionTitle + "...");
+        sseService.sendUpdate(context.getJobId(), "QA Panel: Verifying citations & logic for " + sectionTitle + "...");
         
         QaEvaluationResult result = evaluateContent(context, sectionContent);
         
         String safeTitle = sectionTitle.replaceAll("[^a-zA-Z0-9\\-_]", "_");
         String finalContent = result.cleanedContent();
         
-        // Rewrite if necessary and save feedback to the QA subfolder
         if (result.failed()) {
-            sseService.sendUpdate(context.getJobId(), "QA Failed! Rewriting section based on auditor feedback...");
+            sseService.sendUpdate(context.getJobId(), "QA Failed! Rewriting section based on auditor panel feedback...");
             
             jobService.saveArtifact(context.getJobId(), "QA/FAILED_" + safeTitle + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
             log.warn("Section QA failed for {}:\n{}", sectionTitle, result.feedback());
             
-            // The RevisionAgent fixes the text
             finalContent = revisionAgent.rewrite(finalContent, result.feedback(), context.getLanguage());
-            
-            // Save the fixed text in the QA folder for control
             jobService.saveArtifact(context.getJobId(), "QA/FIXED_" + safeTitle + ".md", finalContent);
         } else {
-            // If everything went well
             jobService.saveArtifact(context.getJobId(), "QA/PASSED_" + safeTitle + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
         }
 
@@ -77,15 +77,13 @@ public class QaOrchestrator {
     }
 
     public String performGlobalRedTeamQa(ResearchContext context, String assembledDraft) {
-        sseService.sendUpdate(context.getJobId(), "Final QA Pass: Verifying edited Red Team citations...");
+        sseService.sendUpdate(context.getJobId(), "Final QA Pass: Verifying edited Red Team citations & logic...");
         
-        // Safely split the final report exactly at the section headers
         String[] sections = assembledDraft.split("(?m)(?=^## )");
         StringBuilder repairedReport = new StringBuilder();
         StringBuilder globalLog = new StringBuilder();
         boolean anySectionFailed = false;
 
-        // Check the assembled report section by section again
         for (String sectionText : sections) {
             if (sectionText.trim().isBlank()) continue;
             
@@ -98,7 +96,7 @@ public class QaOrchestrator {
             
             if (result.failed()) {
                 anySectionFailed = true;
-                sseService.sendUpdate(context.getJobId(), "Final QA: Fixing hallucinated counter-claims in a section...");
+                sseService.sendUpdate(context.getJobId(), "Final QA: Fixing logical errors and hallucinated claims...");
                 finalContent = revisionAgent.rewrite(finalContent, result.feedback(), context.getLanguage());
             }
             
@@ -108,7 +106,6 @@ public class QaOrchestrator {
 
         String finalReportText = repairedReport.toString().trim();
 
-        // Save artifacts exactly like in Phase 1 (Full Log)
         if (anySectionFailed) {
             jobService.saveArtifact(context.getJobId(), "QA/FAILED_GLOBAL_RedTeam.txt", globalLog.toString());
             jobService.saveArtifact(context.getJobId(), "QA/FIXED_GLOBAL_RedTeam.md", finalReportText);
@@ -125,7 +122,6 @@ public class QaOrchestrator {
         List<String> usedIds = new ArrayList<>();
         String cleanedContent = content;
         
-        // 1. Collect IDs and fix typographical dashes (very important!)
         while (m.find()) {
             String rawId = m.group(1);
             String cleanId = rawId.replace("–", "-").replace("—", "-");
@@ -140,11 +136,10 @@ public class QaOrchestrator {
         boolean failed = false;
         StringBuilder feedback = new StringBuilder();
 
-        // 2. Hallucination check (Merciless Java Check)
         for (String id : usedIds.stream().distinct().toList()) {
             ValidatedResult vr = context.getPaperDatabase().get(id);
             if (vr != null) {
-                sectionSources.add(vr); // Real paper
+                sectionSources.add(vr); 
             } else {
                 failed = true;
                 feedback.append("- ID [").append(id).append("] -> Valid: false\n")
@@ -152,19 +147,35 @@ public class QaOrchestrator {
             }
         }
 
-        // 3. Batch check of real papers by the LLM
         int batchSize = 30;
         for (int j = 0; j < sectionSources.size(); j += batchSize) {
             List<ValidatedResult> batch = sectionSources.subList(j, Math.min(j + batchSize, sectionSources.size()));
-            Map<String, CitationQaAgent.QaEvaluation> evals = qaAgent.verifyCitations(cleanedContent, batch, context.getLanguage());
             
-            for (Map.Entry<String, CitationQaAgent.QaEvaluation> entry : evals.entrySet()) {
-                // Log EVERYTHING, even successful checks!
-                feedback.append("- ID [").append(entry.getKey()).append("] -> Valid: ").append(entry.getValue().valid()).append("\n")
-                        .append("  Reason: ").append(entry.getValue().reason()).append("\n\n");
+            // DEPLOY THE PANEL OF EXPERTS
+            Map<String, CitationQaAgent.QaEvaluation> citeEvals = citationQaAgent.verifyCitations(cleanedContent, batch, context.getLanguage());
+            Map<String, LogicalFallacyQaAgent.QaEvaluation> logicEvals = logicQaAgent.verifyLogic(cleanedContent, batch, context.getLanguage());
+            
+            for (ValidatedResult vr : batch) {
+                String paperId = vr.originalResult().id();
+                var citeEval = citeEvals.get(paperId);
+                var logicEval = logicEvals.get(paperId);
                 
-                if (!entry.getValue().valid()) {
+                boolean isCiteValid = citeEval != null && citeEval.valid();
+                boolean isLogicValid = logicEval != null && logicEval.valid();
+                
+                if (!isCiteValid || !isLogicValid) {
                     failed = true;
+                    feedback.append("- ID [").append(paperId).append("] -> Valid: false\n");
+                    if (!isCiteValid && citeEval != null) {
+                        feedback.append("  Citation Error: ").append(citeEval.reason()).append("\n");
+                    }
+                    if (!isLogicValid && logicEval != null) {
+                        feedback.append("  Logic Error: ").append(logicEval.reason()).append("\n");
+                    }
+                    feedback.append("\n");
+                } else {
+                    feedback.append("- ID [").append(paperId).append("] -> Valid: true\n")
+                            .append("  Reason: Passed both Citation Fidelity and Logical/Physics Audit.\n\n");
                 }
             }
         }

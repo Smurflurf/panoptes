@@ -4,15 +4,19 @@ export function initMarkdownRenderer() {
     
     if (!rawMd || !outputDiv) return;
 
-    let mdText = rawMd.value;
+	let mdText = rawMd.value
+	
+	mdText = mdText.replace(/(?<!\\)\$\$(.*?)(?<!\\)\$\$/gs, function(match, math) {
+		let fixed = math.replace(/\\/g, '\\\\');
+		fixed = fixed.replace(/(\d),(\d)/g, '$1{,}$2');
+		return '$$' + fixed + '$$';
+	});
 
-	    mdText = mdText.replace(/(?<!\\)\$\$(.*?)(?<!\\)\$\$/gs, function(match, math) {
-        return '$$' + math.replace(/\\/g, '\\\\') + '$$';
-    });
-    
-    mdText = mdText.replace(/(?<!\\)\$(.*?)(?<!\\)\$/g, function(match, math) {
-        return '$' + math.replace(/\\/g, '\\\\') + '$';
-    });
+	mdText = mdText.replace(/(?<!\\)\$(.*?)(?<!\\)\$/g, function(match, math) {
+		let fixed = math.replace(/\\/g, '\\\\');
+		fixed = fixed.replace(/(\d),(\d)/g, '$1{,}$2');
+		return '$' + fixed + '$';
+	});
 
     marked.setOptions({ breaks: true, gfm: true });
     outputDiv.innerHTML = marked.parse(mdText);

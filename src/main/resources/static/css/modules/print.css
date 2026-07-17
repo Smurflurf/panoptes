@@ -136,4 +136,17 @@
     .tldr-box strong {
         color: #000 !important;
     }
+    
+    .katex-mathml {
+        display: none !important;
+    }
+    
+    .katex {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    
+    .katex-html {
+        display: inline-block !important;
+    }
 }
