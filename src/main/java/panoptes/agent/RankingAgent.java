@@ -86,14 +86,14 @@ public class RankingAgent extends AbstractAgent {
                 .build();
 
         String sysPrompt = """
-            You objectively evaluate academic papers based on RELEVANCE and TRUSTWORTHINESS.
-            CRITICAL RULES:
-            1. BE CRITICAL OF PEER REVIEW: A 'Peer Reviewed: YES' flag is a good baseline, but it does NOT guarantee high quality! If the abstract reveals a weak methodology, or if it is an old paper with very few citations, do NOT give it a high score just because it was peer-reviewed. Always consider the publication year!
-            2. PREPRINTS NEED CITATIONS: If a paper is 'NO (Preprint)', it MUST have a high 'Citation Count' to be trusted.
-            3. SERENDIPITY: Papers from different fields are allowed if concepts are transferable.
-            4. EXHAUSTIVE SCORING: You must provide a score for EVERY single ID.
-            """;
-
+                You objectively evaluate academic papers based on RELEVANCE and TRUSTWORTHINESS.
+                CRITICAL RULES:
+                1. BE CRITICAL OF PEER REVIEW & AGE: A 'Peer Reviewed: YES' flag is a good baseline, but it does NOT guarantee high quality! If a paper is older than 10 years and has less than 5 citations, heavily PENALIZE its score (drop it to the 10-30 range), unless it is the ONLY paper answering the prompt. Always consider the publication year!
+                2. PREPRINTS NEED CITATIONS: If a paper is 'NO (Preprint)', it MUST have a high 'Citation Count' to be trusted.
+                3. SERENDIPITY: Papers from different fields are allowed if concepts are transferable.
+                4. EXHAUSTIVE SCORING: You must provide a score for EVERY single ID.
+                """;
+        
         String json = executePonder(sysPrompt + "\n\n" + prompt.toString(), null, jsonSchema, language);
 
         try {

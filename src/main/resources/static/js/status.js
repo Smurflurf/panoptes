@@ -59,17 +59,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     apiBanner.classList.remove('hidden-data');
                     apiBanner.style.display = 'flex'; // Ensure flex layout is restored
                     dismissedAtCount = -1;
-                }
-            }
-            return;
-        }
+				}
+			}
+			return;
+		}
 
-        // Standard logging for pipeline updates
-        const line = document.createElement('div');
-        line.className = 'log-line';
-        line.textContent = "> " + rawData;
-        consoleEl.appendChild(line);
-        consoleEl.scrollTop = consoleEl.scrollHeight;
+		// Standard logging for pipeline updates
+		let logText = rawData;
+
+		logText = logText.replace(/(?<!\\)\$\$(.*?)(?<!\\)\$\$/gs, function(match, math) {
+			return '$$' + math.replace(/(\d),(\d)/g, '$1{,}$2') + '$$';
+		});
+		logText = logText.replace(/(?<!\\)\$(.*?)(?<!\\)\$/g, function(match, math) {
+			return '$' + math.replace(/(\d),(\d)/g, '$1{,}$2') + '$';
+		});
+
+		const line = document.createElement('div');
+		line.className = 'log-line';
+		line.textContent = "> " + logText;
+
+		consoleEl.appendChild(line);
+
+		if (window.renderMathInElement) {
+			renderMathInElement(line, {
+				delimiters: [
+					{ left: '$$', right: '$$', display: true },
+					{ left: '$', right: '$', display: false },
+					{ left: '\\(', right: '\\)', display: false },
+					{ left: '\\[', right: '\\]', display: true }
+				],
+				throwOnError: false
+			});
+		}
+
+		consoleEl.scrollTop = consoleEl.scrollHeight;
     });
 
     eventSource.addEventListener('complete', (e) => {

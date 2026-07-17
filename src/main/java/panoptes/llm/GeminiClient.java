@@ -119,7 +119,7 @@ public class GeminiClient {
 
                 String text;
                 try {
-                    text = llmCall.get(100, TimeUnit.SECONDS);
+                    text = llmCall.get(150, TimeUnit.SECONDS);
                 } catch (TimeoutException te) {
                     llmCall.cancel(true);
                     throw new RuntimeException("API HANG DETECTED (Timeout exceeded). Forcing retry...", te);

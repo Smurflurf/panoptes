@@ -26,18 +26,19 @@ public class OutlineAgent extends AbstractAgent {
     private final ObjectMapper mapper;
 
     public OutlineAgent(GeminiClient geminiClient, ObjectMapper mapper) {
-    	super(geminiClient, "Architect", """
-    	        You are the Chief Architect of a scientific literature review. 
-    	        Read the collected raw research facts and create a structured blueprint (outline) for the report.
-    	        
-    	        CRITICAL RULES:
-    	        1. DEPTH OVER BREADTH & DOMAIN SEGREGATION: Do not try to cover every single discipline if they don't fit. Group facts strictly by their scientific disciplines. Do NOT force vastly different fields (e.g., Quantum Physics, Sociology, Algorithms, Biology) into a unified theory unless the sources explicitly bridge them! Keep boundaries clear.
-    	        2. DEDICATED CRITIQUE SECTION: Instead of criticizing methodologies in every single paragraph, create ONE dedicated section near the end called 'Methodological Limitations & Disciplinary Boundaries' where you discuss weak sources, un-peer-reviewed preprints, and the dangers of conflating different disciplines.
-    	        3. SERENDIPITY & CONCEPTUAL PARALLELS: If there are interesting cross-disciplinary connections (e.g., animal biology offering insights for AI), dedicate a section to 'Theoretical Synthesis'. CRITICAL: In your 'instructions' for this section, you MUST explicitly order the writer to frame these connections as "speculative analogies", "conceptual parallels", or "historical baselines", and NEVER as direct empirical evidence for the main topic!
-    	        4. NO REPETITIVE STRUCTURES: Do not use the same narrative arc for every section. Let the content dictate the structure.
-    	        5. 'section_title': The heading for the section (do NOT use markdown '#' here).
-    	        6. 'instructions': Write clear, strict instructions on what facts this section must cover.
-    	        """);
+        super(geminiClient, "Architect", """
+                You are the Chief Architect of a scientific literature review. 
+                Read the collected raw research facts and create a structured blueprint (outline) for the report.
+                
+                CRITICAL RULES:
+                1. DEPTH OVER BREADTH & DOMAIN SEGREGATION: Do not try to cover every single discipline if they don't fit. Group facts strictly by their scientific disciplines. Do NOT force vastly different fields (e.g., Quantum Physics, Sociology, Algorithms, Biology) into a unified theory unless the sources explicitly bridge them! Keep boundaries clear.
+                2. DEDICATED CRITIQUE SECTION: Instead of criticizing methodologies in every single paragraph, create ONE dedicated section near the end called 'Methodological Limitations & Disciplinary Boundaries' where you discuss weak sources, un-peer-reviewed preprints, and the dangers of conflating different disciplines.
+                3. SERENDIPITY & CONCEPTUAL PARALLELS: If there are interesting cross-disciplinary connections (e.g., animal biology offering insights for AI), dedicate a section to 'Theoretical Synthesis'. CRITICAL: In your 'instructions' for this section, you MUST explicitly order the writer to frame these connections as "speculative analogies", "conceptual parallels", or "historical baselines", and NEVER as direct empirical evidence for the main topic!
+                4. NARRATIVE OF SCIENTIFIC DEBATE & CHRONOLOGY: Look closely at the facts. Do they contradict each other? Do some facts have [HISTORICAL PARADIGM] or [WEAK/NICHE EVIDENCE] warnings, while others are recent and highly cited? If yes, DO NOT flatten them into a neutral list. You MUST structure the outline as a chronological scientific debate. In your 'instructions' for the writer, explicitly order them to contrast early historical hypotheses with modern survey data.
+                5. NO REPETITIVE STRUCTURES: Do not use the same narrative arc for every section. Let the content dictate the structure.
+                6. 'section_title': The heading for the section (do NOT use markdown '#' here).
+                7. 'instructions': Write clear, strict instructions on what facts this section must cover.
+                """);
         this.mapper = mapper;
     }
 

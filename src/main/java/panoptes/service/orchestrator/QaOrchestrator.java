@@ -8,11 +8,14 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import panoptes.agent.CitationQaAgent;
 import panoptes.agent.LogicalFallacyQaAgent;
+import panoptes.agent.QaCorrectionPlannerAgent;
 import panoptes.agent.RevisionAgent;
+import panoptes.dto.PlanStep;
 import panoptes.dto.ResearchContext;
 import panoptes.dto.ValidatedResult;
 import panoptes.util.CitationUtil;
@@ -22,15 +25,23 @@ import panoptes.web.SseService;
 /**
  * The orchestration layer dedicated to Quality Assurance (QA) and hallucination prevention.
  * <p>
- * This service enforces Panoptes' strict epistemic standards by deploying a "Panel of Auditors".
- * It parses drafted sections, extracts all referenced paper IDs, and performs a ruthless verification process:
+ * This service enforces Panoptes' strict epistemic standards by deploying a "Panel of Auditors"
+ * and managing an autonomous, iterative feedback and corrective research loop:
  * <ol>
  *   <li><b>Hard Java Check:</b> Verifies if the referenced ID actually exists in the local paper database. If it is fabricated, the claim instantly fails.</li>
  *   <li><b>Citation Fidelity:</b> Dispatches sources to the {@link panoptes.agent.CitationQaAgent} to ensure the drafted claim matches the original abstract without cherry-picking or concept shifting.</li>
- *   <li><b>Logical & Scale Audit:</b> Dispatches sources to the {@link panoptes.agent.LogicalFallacyQaAgent} to detect false equivalences, mismatched physical units, and scale conflations (e.g., evolution vs. real-time behavior).</li>
+ *   <li><b>Logical & Scale Audit:</b> Dispatches sources to the {@link panoptes.agent.LogicalFallacyQaAgent} to detect false equivalences, mismatched physical units, and scale conflations (e.g., cosmological FLRW metrics vs. local black hole interiors).</li>
  * </ol>
- * If a section fails QA, this orchestrator automatically triggers the {@link panoptes.agent.RevisionAgent} 
- * to rewrite the text and logs the exact failure reasons to the filesystem for transparency.
+ * </p>
+ * <p>
+ * If a section fails the QA process, the orchestrator does not simply soften or delete the claims.
+ * Instead, it triggers an autonomous corrective loop to actively resolve the issue:
+ * <ul>
+ *   <li>It invokes the {@link panoptes.agent.QaCorrectionPlannerAgent} to analyze the failed draft alongside the exact auditor feedback and generate targeted search queries.</li>
+ *   <li>It dispatches these queries to the {@link panoptes.service.orchestrator.InvestigationOrchestrator} to execute standard searches and retrieve new empirical facts.</li>
+ *   <li>It utilizes the {@link panoptes.agent.RevisionAgent} to rewrite the section, replacing hallucinated or weak claims with the newly retrieved, verified citations.</li>
+ * </ul>
+ * This corrective loop is repeated up to a configured threshold to ensure rigorous fact-checking and maximum report integrity.
  * </p>
  */
 @Service
@@ -41,79 +52,127 @@ public class QaOrchestrator {
     private final CitationQaAgent citationQaAgent;
     private final LogicalFallacyQaAgent logicQaAgent;
     private final RevisionAgent revisionAgent;
+    private final QaCorrectionPlannerAgent qaCorrectionPlanner;
+    private final InvestigationOrchestrator investigationOrchestrator;
     private final JobService jobService;
     private final SseService sseService;
 
+    // @Lazy verhindert Zirkelbezüge (Circular Dependencies) beim Spring Boot Start!
     public QaOrchestrator(CitationQaAgent citationQaAgent, LogicalFallacyQaAgent logicQaAgent, 
-                          RevisionAgent revisionAgent, JobService jobService, SseService sseService) {
+                          RevisionAgent revisionAgent, QaCorrectionPlannerAgent qaCorrectionPlanner,
+                          @Lazy InvestigationOrchestrator investigationOrchestrator,
+                          JobService jobService, SseService sseService) {
         this.citationQaAgent = citationQaAgent;
         this.logicQaAgent = logicQaAgent;
         this.revisionAgent = revisionAgent;
+        this.qaCorrectionPlanner = qaCorrectionPlanner;
+        this.investigationOrchestrator = investigationOrchestrator;
         this.jobService = jobService;
         this.sseService = sseService;
     }
 
     public String performSectionQa(ResearchContext context, String sectionTitle, String sectionContent) {
-        sseService.sendUpdate(context.getJobId(), "QA Panel: Verifying citations & logic for " + sectionTitle + "...");
-        
-        QaEvaluationResult result = evaluateContent(context, sectionContent);
-        
         String safeTitle = sectionTitle.replaceAll("[^a-zA-Z0-9\\-_]", "_");
-        String finalContent = result.cleanedContent();
-        
-        if (result.failed()) {
-            sseService.sendUpdate(context.getJobId(), "QA Failed! Rewriting section based on auditor panel feedback...");
+        String currentContent = sectionContent;
+        int maxRetries = 3; // Reduziert auf 3, um API-Kosten bei Endlosschleifen zu sparen
+        boolean sectionPerfect = false;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            sseService.sendUpdate(context.getJobId(), "QA Panel (Attempt " + attempt + "/" + maxRetries + "): Verifying citations & logic for " + sectionTitle + "...");
+            QaEvaluationResult result = evaluateContent(context, currentContent);
             
-            jobService.saveArtifact(context.getJobId(), "QA/FAILED_" + safeTitle + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
-            log.warn("Section QA failed for {}:\n{}", sectionTitle, result.feedback());
-            
-            finalContent = revisionAgent.rewrite(finalContent, result.feedback(), context.getLanguage());
-            jobService.saveArtifact(context.getJobId(), "QA/FIXED_" + safeTitle + ".md", finalContent);
-        } else {
-            jobService.saveArtifact(context.getJobId(), "QA/PASSED_" + safeTitle + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
+            if (!result.failed()) {
+                jobService.saveArtifact(context.getJobId(), "QA/PASSED_" + safeTitle + "_Att" + attempt + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
+                currentContent = result.cleanedContent();
+                sectionPerfect = true;
+                break; // Exit the loop, section is perfect!
+            } else {
+                jobService.saveArtifact(context.getJobId(), "QA/FAILED_" + safeTitle + "_Att" + attempt + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
+                log.warn("Section QA failed for {} on attempt {}:\n{}", sectionTitle, attempt, result.feedback());
+                
+                sseService.sendUpdate(context.getJobId(), "QA Failed! Auditor detected hallucination or gap. Triggering corrective research...");
+                
+                // 1. QA Correction Planner analysiert das Feedback und generiert neue Suchanfragen
+                List<PlanStep> correctiveSteps = qaCorrectionPlanner.planCorrection(currentContent, result.feedback(), context.getLanguage());
+                
+                // 2. InvestigationOrchestrator sucht nach den echten Fakten
+                List<String> newFacts = investigationOrchestrator.executeStandardSearch(context, correctiveSteps);
+                
+                sseService.sendUpdate(context.getJobId(), "QA Research complete. Rewriting section with empirical facts...");
+                
+                // 3. RevisionAgent flickt den Text mit den NEUEN Fakten
+                currentContent = revisionAgent.rewriteWithFacts(result.cleanedContent(), result.feedback(), newFacts, context.getLanguage());
+            }
         }
 
-        return CitationUtil.enrichCiteTags(finalContent, context.getPaperDatabase());
+        if (!sectionPerfect) {
+            sseService.sendUpdate(context.getJobId(), "Warning: Section '" + sectionTitle + "' still had minor QA warnings after " + maxRetries + " attempts. Proceeding anyway.");
+        }
+
+        return CitationUtil.enrichCiteTags(currentContent, context.getPaperDatabase());
     }
 
     public String performGlobalRedTeamQa(ResearchContext context, String assembledDraft) {
-        sseService.sendUpdate(context.getJobId(), "Final QA Pass: Verifying edited Red Team citations & logic...");
-        
-        String[] sections = assembledDraft.split("(?m)(?=^## )");
-        StringBuilder repairedReport = new StringBuilder();
-        StringBuilder globalLog = new StringBuilder();
-        boolean anySectionFailed = false;
+        String currentDraft = assembledDraft;
+        int maxRetries = 3;
 
-        for (String sectionText : sections) {
-            if (sectionText.trim().isBlank()) continue;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            sseService.sendUpdate(context.getJobId(), "Final QA Pass (Attempt " + attempt + "/" + maxRetries + "): Verifying edited Red Team citations...");
             
-            QaEvaluationResult result = evaluateContent(context, sectionText);
-            
-            globalLog.append("--- SECTION FEEDBACK ---\n")
-                     .append(result.feedback().isBlank() ? "No citations in this section.\n\n" : result.feedback() + "\n\n");
+            String[] sections = currentDraft.split("(?m)(?=^## )");
+            StringBuilder repairedReport = new StringBuilder();
+            StringBuilder globalLog = new StringBuilder();
+            boolean anySectionFailed = false;
 
-            String finalContent = result.cleanedContent();
-            
-            if (result.failed()) {
-                anySectionFailed = true;
-                sseService.sendUpdate(context.getJobId(), "Final QA: Fixing logical errors and hallucinated claims...");
-                finalContent = revisionAgent.rewrite(finalContent, result.feedback(), context.getLanguage());
+            for (String sectionText : sections) {
+                if (sectionText.trim().isBlank()) continue;
+                
+                // SAFE SPLIT: Header sichern, damit der RevisionAgent ihn nicht löscht!
+                String header = "";
+                String body = sectionText;
+                if (sectionText.startsWith("## ")) {
+                    int firstNewline = sectionText.indexOf('\n');
+                    if (firstNewline != -1) {
+                        header = sectionText.substring(0, firstNewline);
+                        body = sectionText.substring(firstNewline).trim();
+                    }
+                }
+                
+                QaEvaluationResult result = evaluateContent(context, body);
+                globalLog.append("--- SECTION FEEDBACK ---\n")
+                         .append(result.feedback().isBlank() ? "No citations in this section.\n\n" : result.feedback() + "\n\n");
+
+                String finalContent = result.cleanedContent();
+                
+                if (result.failed()) {
+                    anySectionFailed = true;
+                    sseService.sendUpdate(context.getJobId(), "Global QA found errors. Triggering corrective research...");
+                    
+                    // Auch hier holen wir uns frische Fakten!
+                    List<PlanStep> correctiveSteps = qaCorrectionPlanner.planCorrection(finalContent, result.feedback(), context.getLanguage());
+                    List<String> newFacts = investigationOrchestrator.executeStandardSearch(context, correctiveSteps);
+                    
+                    finalContent = revisionAgent.rewriteWithFacts(finalContent, result.feedback(), newFacts, context.getLanguage());
+                }
+                
+                // Header wieder ankleben
+                if (!header.isBlank()) {
+                    repairedReport.append(header).append("\n\n");
+                }
+                repairedReport.append(finalContent).append("\n\n");
             }
-            
-            finalContent = CitationUtil.enrichCiteTags(finalContent, context.getPaperDatabase());
-            repairedReport.append(finalContent).append("\n\n");
+
+            currentDraft = repairedReport.toString().trim();
+
+            if (!anySectionFailed) {
+                jobService.saveArtifact(context.getJobId(), "QA/PASSED_GLOBAL_RedTeam_Att" + attempt + ".txt", globalLog.toString());
+                break; // Everything passed!
+            } else {
+                jobService.saveArtifact(context.getJobId(), "QA/FAILED_GLOBAL_RedTeam_Att" + attempt + ".txt", globalLog.toString());
+            }
         }
-
-        String finalReportText = repairedReport.toString().trim();
-
-        if (anySectionFailed) {
-            jobService.saveArtifact(context.getJobId(), "QA/FAILED_GLOBAL_RedTeam.txt", globalLog.toString());
-            jobService.saveArtifact(context.getJobId(), "QA/FIXED_GLOBAL_RedTeam.md", finalReportText);
-        } else {
-            jobService.saveArtifact(context.getJobId(), "QA/PASSED_GLOBAL_RedTeam.txt", globalLog.toString());
-        }
-
-        return finalReportText;
+        
+        return currentDraft;
     }
     
     private QaEvaluationResult evaluateContent(ResearchContext context, String content) {
@@ -163,20 +222,29 @@ public class QaOrchestrator {
                 boolean isCiteValid = citeEval != null && citeEval.valid();
                 boolean isLogicValid = logicEval != null && logicEval.valid();
                 
+                // 1. Status (FAILED oder PASSED)
                 if (!isCiteValid || !isLogicValid) {
                     failed = true;
-                    feedback.append("- ID [").append(paperId).append("] -> Valid: false\n");
-                    if (!isCiteValid && citeEval != null) {
-                        feedback.append("  Citation Error: ").append(citeEval.reason()).append("\n");
-                    }
-                    if (!isLogicValid && logicEval != null) {
-                        feedback.append("  Logic Error: ").append(logicEval.reason()).append("\n");
-                    }
-                    feedback.append("\n");
+                    feedback.append("- ID [").append(paperId).append("] -> Valid: FALSE\n");
                 } else {
-                    feedback.append("- ID [").append(paperId).append("] -> Valid: true\n")
-                            .append("  Reason: Passed both Citation Fidelity and Logical/Physics Audit.\n\n");
+                    feedback.append("- ID [").append(paperId).append("] -> Valid: TRUE\n");
                 }
+                
+                // 2. Save the QA citation agents feedback log
+                if (citeEval != null) {
+                    feedback.append("  Citation Feedback: ").append(citeEval.reason()).append("\n");
+                } else {
+                    feedback.append("  Citation Feedback: [No feedback received]\n");
+                }
+                
+                // 3. Save the QA logic agents feedback log
+                if (logicEval != null) {
+                    feedback.append("  Logical Feedback: ").append(logicEval.reason()).append("\n");
+                } else {
+                    feedback.append("  Logical Feedback: [No feedback received]\n");
+                }
+                
+                feedback.append("\n");
             }
         }
         
