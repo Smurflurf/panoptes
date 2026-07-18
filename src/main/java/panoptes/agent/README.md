@@ -35,15 +35,16 @@ This document outlines the distinct phases of the research pipeline and the resp
 
 ---
 
-## Phase 4: Quality Assurance (QA)
+## Phase 4: Quality Assurance (QA) & Autonomous Correction
 
-**Goal:** Ruthlessly eliminate hallucinations, misapplied citations, and logical fallacies via a "Panel of Auditors".
+**Goal:** Ruthlessly eliminate hallucinations, misapplied citations, and logical fallacies via a "Panel of Auditors" and actively research missing facts.
 
-*Note: This phase is orchestrated by the `QaOrchestrator`, which performs a hard Java-level verification of cited IDs before deploying the following panel of experts in parallel.*
+*Note: This phase is orchestrated by the `QaOrchestrator`, which performs a hard Java-level verification of cited IDs before deploying the following panel of experts. If errors are found, it triggers an autonomous ReAct (Reasoning and Acting) loop.*
 
-1.  **`CitationQaAgent`**: The fidelity auditor. It compares the drafted text against the original source abstracts. If a claim misrepresents a paper, shifts the concept, or cherry-picks a background premise while ignoring the paper's actual conclusion, this agent fails the citation.
-2.  **`LogicalFallacyQaAgent`**: The logic and methodology auditor. It scans the draft specifically for "Apples to Oranges" comparisons (e.g., contrasting a system's energy in Joules against another's conductivity in Siemens) and scale conflation (e.g., applying papers about multi-generational evolution to criticize real-time pathfinding).
-3.  **`RevisionAgent`**: Receives any drafted sections that failed the QA audit. It rewrites the text strictly based on the combined brutal feedback of both auditors, removing invalid claims or adjusting the narrative to reflect reality.
+1.  **`CitationQaAgent`**: The fidelity auditor. It compares the drafted text against the original source abstracts. If a claim misrepresents a paper, shifts the concept, or generalizes a toy-model to reality, this agent fails the citation.
+2.  **`LogicalFallacyQaAgent`**: The logic and methodology auditor. It scans the draft specifically for "Apples to Oranges" comparisons, scale conflation, and critically, *uncited hallucinations* brought in from the LLM's pre-training data.
+3.  **`QaCorrectionPlannerAgent`**: The tactical researcher. If a section fails the audit, this agent analyzes the auditor's brutal feedback and generates highly targeted search queries to actively find the missing empirical facts via the vector database.
+4.  **`RevisionAgent`**: The editor. Receives the failed drafted section, the auditors' feedback, and the *newly gathered facts* from the Correction Planner. It rewrites the text to reflect reality, integrating the new valid citations and removing hallucinated claims.
 
 ---
 

@@ -15,3 +15,10 @@
 
 /* 4. PDF Export & Print Overrides */
 @import url('modules/print.css');
+
+
+
+[data-theme="midnight"] .brand-title i {
+    color: var(--text-primary);
+    filter: drop-shadow(0 0 8px var(--text-primary));
+}

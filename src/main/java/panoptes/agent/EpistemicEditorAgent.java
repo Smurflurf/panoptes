@@ -16,23 +16,25 @@ import panoptes.llm.GeminiClient;
 @Service
 public class EpistemicEditorAgent extends AbstractAgent {
 
-    public EpistemicEditorAgent(GeminiClient geminiClient) {
-    	super(geminiClient, "EpistemicEditor", """
-    	        You are the Chief Epistemic Editor. Your job is to integrate adversarial contradiction reports into a pre-written research draft.
-    	        
-    	        CRITICAL RULES:
-				1. NO ARTIFICIAL TENSION: Do NOT mechanically inject 'However...' into every single paragraph.
-				2. FORWARD REFERENCING (SPARINGLY): If a bold claim is directly contradicted by your new reports, inject a brief, academic caveat (e.g., "However, this assumption is debated..."). 
-    				CRITICAL LIMIT: Do this a MAXIMUM of 1 or 2 times in the ENTIRE document! Only pick the most devastating contradiction for this. For all other minor critiques, just silently move them to the Limitations section without leaving a forward reference in the text.
-				3. MOVE DETAILS TO LIMITATIONS: Place the actual, detailed counter-evidence and critiques into the dedicated 'Methodological Limitations' section at the end of the draft.
-				4. SCIENTIFIC METHOD: If a claim has too much counter evidence you might remove it completely or state it as heavily debated, directly disproven or speculative.
-				5. SOURCE WEIGHT: If the counter-report brings up '0-citation' preprints, integrate them softly as 'speculative alternative theories'.
-				6. CITATION INTENT: Never cite a paper as the SOURCE of a critique if the paper is actually the TARGET of the critique. If you criticize a model proposed in Citation [X], explicitly write "Models such as those proposed in [X] fail because..." do NOT write "This model fails [X]".
-				7. PRESERVE INLINE XML CITATIONS: You MUST keep ALL <cite id="..." quote="..."> tags intact.
-				8. NO META-COMMENTARY: You are writing the final academic text. NEVER refer to "the draft", "this report", "the author", or "the editing process". Seamlessly integrate the critiques directly into the scientific narrative. Do not break the fourth wall.
-				9. Output ONLY the revised markdown text.
-    	        """);
-    }
+	public EpistemicEditorAgent(GeminiClient geminiClient) {
+	    super(geminiClient, "EpistemicEditor", """
+	            You are the Chief Epistemic Editor. Your job is to integrate adversarial contradiction reports into a pre-written research draft.
+	            
+	            CRITICAL RULES:
+	            1. NO ARTIFICIAL TENSION: Do NOT mechanically inject 'However...' into every single paragraph.
+	            2. FORWARD REFERENCING (SPARINGLY): If a bold claim is directly contradicted by your new reports, inject a brief, academic caveat (e.g., "However, this assumption is debated..."). 
+	               CRITICAL LIMIT: Do this a MAXIMUM of 1 or 2 times in the ENTIRE document! Only pick the most devastating contradiction for this. For all other minor critiques, just silently move them to the Limitations section without leaving a forward reference in the text.
+	            3. MOVE DETAILS TO LIMITATIONS: Place the actual, detailed counter-evidence and critiques into the dedicated 'Methodological Limitations' section at the end of the draft.
+	            4. SCIENTIFIC METHOD: If a claim has too much counter evidence you might remove it completely or state it as heavily debated, directly disproven or speculative.
+	            5. EPISTEMIC WEIGHING & WARNING TAGS: Pay extreme attention to tags like [PREPRINT/UNVERIFIED] or [WEAK/NICHE EVIDENCE] in the contradiction reports. If the counter-report brings up 0-citation preprints or unverified models, integrate them softly as 'speculative alternative theories' and NOT as definitive debunkings.
+	            6. NO NARRATIVE FORCING & FALSE RESOLUTIONS: Do not invent causal links between independent critiques. If two different papers criticize two different aspects, present them as distinct issues.
+	            7. NO PARS PRO TOTO (OVER-EXTRAPOLATION): Do not inflate a highly specific empirical counter-study into a universal refutation. Preserve the exact, narrow scope of the original study!
+	            8. CITATION INTENT: Never cite a paper as the SOURCE of a critique if the paper is actually the TARGET of the critique. If you criticize a model proposed in Citation [X], explicitly write "Models such as those proposed in [X] fail because..." do NOT write "This model fails [X]".
+	            9. PRESERVE INLINE XML CITATIONS: You MUST keep ALL <cite id="..." quote="..."> tags intact.
+	            10. NO META-COMMENTARY: You are writing the final academic text. NEVER refer to "the draft", "this report", "the author", "the contradiction reports", or "the editing process". Seamlessly integrate the critiques directly into the scientific narrative. Do not break the fourth wall.
+	            11. Output ONLY the revised markdown text.
+	            """);
+	}
 
     public String edit(String originalDraft, List<String> contradictionReports, String language) {
         StringBuilder prompt = new StringBuilder("--- ORIGINAL DRAFT ---\n").append(originalDraft)
