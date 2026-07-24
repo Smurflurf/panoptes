@@ -8,18 +8,28 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Part;
 
-import panoptes.agent.*;
+import panoptes.agent.CoherenceAgent;
+import panoptes.agent.EpistemicEditorAgent;
+import panoptes.agent.IdeaExtractionAgent;
 import panoptes.agent.IdeaExtractionAgent.ExtractedIdea;
+import panoptes.agent.ImplicationAgent;
+import panoptes.agent.OutlineAgent;
 import panoptes.agent.OutlineAgent.SectionPlan;
-import panoptes.llm.GeminiClient;
+import panoptes.agent.PlanAgent;
+import panoptes.agent.RedTeamAgent;
+import panoptes.agent.SectionWriterAgent;
+import panoptes.agent.SilverPlateAgent;
+import panoptes.agent.TldrAgent;
 import panoptes.dto.PlanStep;
 import panoptes.dto.ResearchContext;
+import panoptes.llm.GeminiClient;
 import panoptes.service.orchestrator.InvestigationOrchestrator;
 import panoptes.service.orchestrator.QaOrchestrator;
 import panoptes.web.JobService;
@@ -44,6 +54,9 @@ public class ResearchPipelineService {
     private static final Logger log = LoggerFactory.getLogger(ResearchPipelineService.class);
     
     public record UploadedFile(String filename, String mimeType, byte[] data) {}
+    
+    @Value("${panoptes.llm.internal-language:Scientific English}")
+    private String internalLanguage;
     
     // Core Agents
     private final IdeaExtractionAgent ideaExtractionAgent;
@@ -97,7 +110,7 @@ public class ResearchPipelineService {
         MDC.put("jobId", jobId);
         long startTime = System.currentTimeMillis();
         
-        ResearchContext context = new ResearchContext(jobId, language, rawInput, files);
+        ResearchContext context = new ResearchContext(jobId, language, internalLanguage, rawInput, files);
 
         try {
             saveInputs(context);
@@ -137,7 +150,7 @@ public class ResearchPipelineService {
             // PHASE 3: COHERENCE CHECK
             // ==========================================
             sseService.sendUpdate(jobId, "Coherence Check: Pruning forced tangents and conceptual overreach...");
-            List<Integer> coherentIndices = coherenceAgent.filterCoherentFacts(context.getCoreIdea(), allFacts, language);
+            List<Integer> coherentIndices = coherenceAgent.filterCoherentFacts(context.getCoreIdea(), allFacts, context.getInternalLanguage());
             List<String> coherentFacts = filterCoherentFacts(allFacts, coherentIndices, jobId);
 
             // ==========================================

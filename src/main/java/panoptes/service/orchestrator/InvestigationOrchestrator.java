@@ -7,8 +7,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import panoptes.agent.AdversarialInvestigatorAgent;
 import panoptes.agent.InvestigatorAgent;
@@ -20,6 +24,7 @@ import panoptes.dto.ResearchContext;
 import panoptes.dto.ValidatedResult;
 import panoptes.service.PaperValidationService;
 import panoptes.util.CitationUtil;
+import panoptes.web.JobService;
 import panoptes.web.SseService;
 
 /**
@@ -37,8 +42,8 @@ import panoptes.web.SseService;
  */
 @Service
 public class InvestigationOrchestrator {
+    private static final Logger log = LoggerFactory.getLogger(InvestigationOrchestrator.class);
     
-    // Start all tasks IMMEDIATELY and entirely in parallel
     private final ExecutorService ioExecutor = Executors.newVirtualThreadPerTaskExecutor();
     
     private final IdeenatlasApiClient apiClient;
@@ -47,16 +52,21 @@ public class InvestigationOrchestrator {
     private final InvestigatorAgent investigatorAgent;
     private final AdversarialInvestigatorAgent adversarialAgent;
     private final SseService sseService;
-
-    public InvestigationOrchestrator(IdeenatlasApiClient apiClient, PaperValidationService validationService,
-                                     RankingAgent rankingAgent, InvestigatorAgent investigatorAgent,
-                                     AdversarialInvestigatorAgent adversarialAgent, SseService sseService) {
+    private final ObjectMapper objectMapper;
+    private final JobService jobService;
+    
+	public InvestigationOrchestrator(IdeenatlasApiClient apiClient, PaperValidationService validationService,
+			RankingAgent rankingAgent, InvestigatorAgent investigatorAgent,
+			AdversarialInvestigatorAgent adversarialAgent, SseService sseService, ObjectMapper objectMapper,
+			JobService jobService) {
         this.apiClient = apiClient;
         this.validationService = validationService;
         this.rankingAgent = rankingAgent;
         this.investigatorAgent = investigatorAgent;
         this.adversarialAgent = adversarialAgent;
         this.sseService = sseService;
+        this.objectMapper = objectMapper;
+        this.jobService = jobService;
     }
 
     public List<String> executeStandardSearch(ResearchContext context, List<PlanStep> steps) {
@@ -70,7 +80,7 @@ public class InvestigationOrchestrator {
                     
                     if (!topResults.isEmpty()) {
                         String contextAwareQuestion = "Context: " + context.getRawInput() + "\nSpecific sub-question: " + step.question();
-                        String rawOutput = investigatorAgent.investigate(contextAwareQuestion, topResults, context.getLanguage());
+                        String rawOutput = investigatorAgent.investigate(contextAwareQuestion, topResults, context.getInternalLanguage());
                         return CitationUtil.enrichCiteTags(rawOutput, context.getPaperDatabase()); 
                     }
                     return (String) null;
@@ -81,10 +91,13 @@ public class InvestigationOrchestrator {
         ).toList();
 
         // Wait for all results and filter out nulls
-        return futures.stream()
+        List<String> results = futures.stream()
                 .map(CompletableFuture::join)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+        
+        snapshotDatabase(context);
+        return results;
     }
 
     public List<String> executeAdversarialSearch(ResearchContext context, List<PlanStep> steps, String draftContext) {
@@ -98,7 +111,7 @@ public class InvestigationOrchestrator {
                     List<ValidatedResult> topResults = fetchAndValidate(context, step, 50, 40);
                     
                     if (!topResults.isEmpty()) {
-                        String rawOutput = adversarialAgent.investigateCounterClaims(draftContext, step.question(), topResults, context.getLanguage());
+                        String rawOutput = adversarialAgent.investigateCounterClaims(draftContext, step.question(), topResults, context.getInternalLanguage());
                         return CitationUtil.enrichCiteTags(rawOutput, context.getPaperDatabase());
                     }
                     return (String) null;
@@ -108,10 +121,13 @@ public class InvestigationOrchestrator {
             }, ioExecutor)
         ).toList();
 
-        return futures.stream()
+        List<String> results = futures.stream()
                 .map(CompletableFuture::join)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+        
+        snapshotDatabase(context);
+        return results;
     }
 
     private List<ValidatedResult> fetchAndValidate(ResearchContext context, PlanStep step, int limit, int minScore) {
@@ -140,7 +156,7 @@ public class InvestigationOrchestrator {
                 .peek(v -> context.getPaperDatabase().put(v.originalResult().id(), v)) // SHARED DATABASE
                 .toList();
 
-        List<RankingAgent.RankEvaluation> evals = rankingAgent.rankWithValidation(step.question(), validatedResults, context.getLanguage());
+        List<RankingAgent.RankEvaluation> evals = rankingAgent.rankWithValidation(step.question(), validatedResults, context.getInternalLanguage());
         
         return evals.stream()
                 .filter(eval -> eval.score() >= minScore)
@@ -148,5 +164,15 @@ public class InvestigationOrchestrator {
                 .filter(Objects::nonNull)
                 .filter(v -> context.getUsedPaperIds().add(v.originalResult().id())) 
                 .collect(Collectors.toList());
+    }
+    
+    private void snapshotDatabase(ResearchContext context) {
+        try {
+            String bibliographyJson = objectMapper.writerWithDefaultPrettyPrinter()
+                                                  .writeValueAsString(context.getPaperDatabase().values());
+            jobService.saveArtifact(context.getJobId(), "bibliography_database.json", bibliographyJson);
+        } catch (Exception e) {
+            log.warn("Could not snapshot bibliography database", e);
+        }
     }
 }

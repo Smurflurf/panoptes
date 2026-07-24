@@ -3,6 +3,7 @@ package panoptes.llm;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +25,7 @@ import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 
 import panoptes.config.LlmProperties;
+import panoptes.web.JobService;
 import panoptes.web.SseService;
 
 /**
@@ -46,19 +48,22 @@ public class GeminiClient {
     private static final Logger log = LoggerFactory.getLogger(GeminiClient.class);
     private final LlmProperties properties;
     private final SseService sseService; 
+    private final JobService jobService;
+    
     private final AtomicInteger keyCounter = new AtomicInteger(0);
     private final ExecutorService timeoutExecutor = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<String, AtomicInteger> jobErrorCounts = new ConcurrentHashMap<>();
-
     private final Map<String, AtomicInteger> jobCallCounts = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> jobRetryCounts = new ConcurrentHashMap<>();
     
-    public GeminiClient(LlmProperties properties, SseService sseService) {
+    public GeminiClient(LlmProperties properties, SseService sseService, JobService jobService) {
         this.properties = properties;
         this.sseService = sseService;
+        this.jobService = jobService;
     }
 
-    public String ponder(String systemInstruction, String userPrompt, List<Part> files, Schema jsonSchema) {
+
+    public String ponder(String agentName, String systemInstruction, String userPrompt, List<Part> files, Schema jsonSchema) {
         List<String> keys = properties.getApiKeys();
         List<String> models = properties.getModels();
 
@@ -76,8 +81,21 @@ public class GeminiClient {
 
         log.debug("LLM REQUEST FROM: {}", callerAgent);
         String jobId = MDC.get("jobId");
+        
+        long callTimestamp = System.currentTimeMillis();
+        String callId = UUID.randomUUID().toString().substring(0, 6);
+        String filePrefix = callTimestamp + "_" + callId;
+        
         if (jobId != null) {
             jobCallCounts.computeIfAbsent(jobId, k -> new AtomicInteger(0)).incrementAndGet();
+            
+            
+			// 1. LOGGING: Save prompt
+            String promptDump = "--- SYSTEM ---\n" + systemInstruction + "\n\n--- USER ---\n" + userPrompt;
+            if (files != null && !files.isEmpty()) {
+                promptDump += "\n\n--- ATTACHED FILES ---\n[ " + files.size() + " binary files attached ]";
+            }
+            jobService.saveArtifact(jobId, "agents/" + agentName + "/" + filePrefix + "_prompt.txt", promptDump);
         }
         
         for (int attempt = 0; attempt < maxRetries; attempt++) {
@@ -133,6 +151,22 @@ public class GeminiClient {
                     text = text.trim();
                 }
 
+                if (jobId != null && text != null) {
+                    // 2. LOGGING: Save response 
+                	String ext = (jsonSchema != null) ? ".json" : ".txt";
+                    jobService.saveArtifact(jobId, "agents/" + agentName + "/" + filePrefix + "_response" + ext, text);
+                    
+                    // 3. SAVE STATS
+                    int currentCalls = jobCallCounts.getOrDefault(jobId, new AtomicInteger(0)).get();
+                    int currentRetries = jobRetryCounts.getOrDefault(jobId, new AtomicInteger(0)).get();
+                    int currentErrors = jobErrorCounts.getOrDefault(jobId, new AtomicInteger(0)).get();
+                    
+                    String statsJson = String.format("{\n  \"total_llm_calls\": %d,\n  \"total_retries\": %d,\n  \"total_errors\": %d,\n  \"status\": \"IN_PROGRESS\"\n}", 
+                            currentCalls, currentRetries, currentErrors);
+                    jobService.saveArtifact(jobId, "execution_stats.json", statsJson);
+
+                }
+                
                 return text;
 
             } catch (Exception e) {

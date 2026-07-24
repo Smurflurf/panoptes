@@ -57,7 +57,6 @@ public class QaOrchestrator {
     private final JobService jobService;
     private final SseService sseService;
 
-    // @Lazy verhindert Zirkelbezüge (Circular Dependencies) beim Spring Boot Start!
     public QaOrchestrator(CitationQaAgent citationQaAgent, LogicalFallacyQaAgent logicQaAgent, 
                           RevisionAgent revisionAgent, QaCorrectionPlannerAgent qaCorrectionPlanner,
                           @Lazy InvestigationOrchestrator investigationOrchestrator,
@@ -74,7 +73,7 @@ public class QaOrchestrator {
     public String performSectionQa(ResearchContext context, String sectionTitle, String sectionContent) {
         String safeTitle = sectionTitle.replaceAll("[^a-zA-Z0-9\\-_]", "_");
         String currentContent = sectionContent;
-        int maxRetries = 3; // Reduziert auf 3, um API-Kosten bei Endlosschleifen zu sparen
+        int maxRetries = 3;
         boolean sectionPerfect = false;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
@@ -85,28 +84,29 @@ public class QaOrchestrator {
                 jobService.saveArtifact(context.getJobId(), "QA/PASSED_" + safeTitle + "_Att" + attempt + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
                 currentContent = result.cleanedContent();
                 sectionPerfect = true;
-                break; // Exit the loop, section is perfect!
+                break; 
             } else {
                 jobService.saveArtifact(context.getJobId(), "QA/FAILED_" + safeTitle + "_Att" + attempt + ".txt", "Section: " + sectionTitle + "\n\n" + result.feedback());
                 log.warn("Section QA failed for {} on attempt {}:\n{}", sectionTitle, attempt, result.feedback());
                 
-                sseService.sendUpdate(context.getJobId(), "QA Failed! Auditor detected hallucination or gap. Triggering corrective research...");
-                
-                // 1. QA Correction Planner analysiert das Feedback und generiert neue Suchanfragen
-                List<PlanStep> correctiveSteps = qaCorrectionPlanner.planCorrection(currentContent, result.feedback(), context.getLanguage());
-                
-                // 2. InvestigationOrchestrator sucht nach den echten Fakten
-                List<String> newFacts = investigationOrchestrator.executeStandardSearch(context, correctiveSteps);
-                
-                sseService.sendUpdate(context.getJobId(), "QA Research complete. Rewriting section with empirical facts...");
-                
-                // 3. RevisionAgent flickt den Text mit den NEUEN Fakten
-                currentContent = revisionAgent.rewriteWithFacts(result.cleanedContent(), result.feedback(), newFacts, context.getLanguage());
+                if (attempt == maxRetries) {
+                    sseService.sendUpdate(context.getJobId(), "Max QA attempts reached. Forcing Editor to ruthlessly delete hallucinated claims...");
+                    currentContent = revisionAgent.rewriteWithFacts(result.cleanedContent(), result.feedback(), List.of(), context.getLanguage());
+                } else {
+                    sseService.sendUpdate(context.getJobId(), "QA Failed! Auditor detected hallucination or gap. Triggering corrective research...");
+                    List<PlanStep> correctiveSteps = qaCorrectionPlanner.planCorrection(currentContent, result.feedback(), context.getLanguage());
+                    List<String> newFacts = investigationOrchestrator.executeStandardSearch(context, correctiveSteps);
+                    
+                    sseService.sendUpdate(context.getJobId(), "QA Research complete. Rewriting section with new empirical facts...");
+                    currentContent = revisionAgent.rewriteWithFacts(result.cleanedContent(), result.feedback(), newFacts, context.getLanguage());
+                }
             }
         }
 
         if (!sectionPerfect) {
-            sseService.sendUpdate(context.getJobId(), "Warning: Section '" + sectionTitle + "' still had minor QA warnings after " + maxRetries + " attempts. Proceeding anyway.");
+            sseService.sendUpdate(context.getJobId(), "Finalizing section '" + sectionTitle + "' after forced correction.");
+            QaEvaluationResult finalResult = evaluateContent(context, currentContent);
+            jobService.saveArtifact(context.getJobId(), "QA/FINAL_FORCED_FIX_" + safeTitle + ".txt", "Section: " + sectionTitle + "\n\n" + finalResult.feedback());
         }
 
         return CitationUtil.enrichCiteTags(currentContent, context.getPaperDatabase());
@@ -127,7 +127,6 @@ public class QaOrchestrator {
             for (String sectionText : sections) {
                 if (sectionText.trim().isBlank()) continue;
                 
-                // SAFE SPLIT: Header sichern, damit der RevisionAgent ihn nicht löscht!
                 String header = "";
                 String body = sectionText;
                 if (sectionText.startsWith("## ")) {
@@ -148,14 +147,12 @@ public class QaOrchestrator {
                     anySectionFailed = true;
                     sseService.sendUpdate(context.getJobId(), "Global QA found errors. Triggering corrective research...");
                     
-                    // Auch hier holen wir uns frische Fakten!
                     List<PlanStep> correctiveSteps = qaCorrectionPlanner.planCorrection(finalContent, result.feedback(), context.getLanguage());
                     List<String> newFacts = investigationOrchestrator.executeStandardSearch(context, correctiveSteps);
                     
                     finalContent = revisionAgent.rewriteWithFacts(finalContent, result.feedback(), newFacts, context.getLanguage());
                 }
                 
-                // Header wieder ankleben
                 if (!header.isBlank()) {
                     repairedReport.append(header).append("\n\n");
                 }
@@ -211,8 +208,8 @@ public class QaOrchestrator {
             List<ValidatedResult> batch = sectionSources.subList(j, Math.min(j + batchSize, sectionSources.size()));
             
             // DEPLOY THE PANEL OF EXPERTS
-            Map<String, CitationQaAgent.QaEvaluation> citeEvals = citationQaAgent.verifyCitations(cleanedContent, batch, context.getLanguage());
-            Map<String, LogicalFallacyQaAgent.QaEvaluation> logicEvals = logicQaAgent.verifyLogic(cleanedContent, batch, context.getLanguage());
+            Map<String, CitationQaAgent.QaEvaluation> citeEvals = citationQaAgent.verifyCitations(cleanedContent, batch, context.getInternalLanguage());
+            Map<String, LogicalFallacyQaAgent.QaEvaluation> logicEvals = logicQaAgent.verifyLogic(cleanedContent, batch, context.getInternalLanguage());
             
             for (ValidatedResult vr : batch) {
                 String paperId = vr.originalResult().id();

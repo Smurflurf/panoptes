@@ -48,8 +48,10 @@ public class CitationUtil {
                 String year = vr.publicationYear() != null ? String.valueOf(vr.publicationYear()) : "Unknown";
                 String pr = vr.isPeerReviewed() ? "YES" : "NO";
                 String cit = String.valueOf(vr.citationCount());
-                
-                String newTag = "<cite id=\"" + id + "\" year=\"" + year + "\" peer_reviewed=\"" + pr + "\" citations=\"" + cit + "\" quote=\"" + quote + "\"></cite>";
+                String source = vr.verificationSource() != null ? vr.verificationSource() : "Unknown"; 
+
+                String newTag = "<cite id=\"" + id + "\" year=\"" + year + "\" peer_reviewed=\"" + pr + 
+                                "\" citations=\"" + cit + "\" source=\"" + source + "\" quote=\"" + quote + "\"></cite>";
                 m.appendReplacement(sb, Matcher.quoteReplacement(newTag));
             } else {
                 m.appendReplacement(sb, Matcher.quoteReplacement(fullTag));

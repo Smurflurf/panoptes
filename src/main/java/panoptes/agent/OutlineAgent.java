@@ -36,8 +36,8 @@ public class OutlineAgent extends AbstractAgent {
                 3. SERENDIPITY & CONCEPTUAL PARALLELS: If there are interesting cross-disciplinary connections (e.g., animal biology offering insights for AI), dedicate a section to 'Theoretical Synthesis'. CRITICAL: In your 'instructions' for this section, you MUST explicitly order the writer to frame these connections as "speculative analogies", "conceptual parallels", or "historical baselines", and NEVER as direct empirical evidence for the main topic!
                 4. NARRATIVE OF SCIENTIFIC DEBATE, CHRONOLOGY & UNRESOLVED CONTROVERSIES: Look closely at the facts. Do they contradict each other? Do some facts have [HISTORICAL PARADIGM] or [WEAK/NICHE EVIDENCE] warnings, while others are recent and highly cited? If yes, DO NOT flatten them into a neutral list. You MUST structure the outline as a chronological scientific debate. Furthermore, if facts show an unresolved debate with contradictory modern papers (e.g., some claiming a method is beneficial, others claiming it causes collapse), you MUST instruct the writer to explicitly frame it as an "ongoing controversy" or "mixed evidence". Do not let the outline flip-flop between absolute statements!
                 5. NO REPETITIVE STRUCTURES: Do not use the same narrative arc for every section. Let the content dictate the structure.
-                6. 'section_title': The heading for the section (do NOT use markdown '#' here).
-                7. 'instructions': Write clear, strict instructions on what facts this section must cover.
+                6. 'section_title': The heading for the section IN THE REQUESTED TARGET LANGUAGE (do NOT use markdown '#' here).
+                7. 'instructions': MUST BE IN ENGLISH! Write clear, strict English instructions on what facts this section must cover.
                 """);
         this.mapper = mapper;
     }

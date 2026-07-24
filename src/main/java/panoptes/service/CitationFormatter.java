@@ -175,15 +175,17 @@ public class CitationFormatter {
 				}
 
 				if (ref.vr.isPeerReviewed()) {
-					String doiUrl = (ref.vr.doi() != null && !ref.vr.doi().isBlank()) ? ref.vr.doi() : "";
-					if (!doiUrl.isBlank()) {
-						metaParts.add("Peer-Reviewed: <a href=\"" + doiUrl
-								+ "\" target=\"_blank\" class=\"meta-yes\">YES</a>");
-					} else {
-						metaParts.add("Peer-Reviewed: <span class=\"meta-yes\">YES</span>");
-					}
+				    String doiUrl = (ref.vr.doi() != null && !ref.vr.doi().isBlank()) ? ref.vr.doi() : "";
+				    String sourceTag = ref.vr.verificationSource() != null ? " <i>(" + ref.vr.verificationSource() + ")</i>" : "";
+				    
+				    if (!doiUrl.isBlank()) {
+				        metaParts.add("Peer-Reviewed: <a href=\"" + doiUrl + "\" target=\"_blank\" class=\"meta-yes\">YES</a>" + sourceTag);
+				    } else {
+				        metaParts.add("Peer-Reviewed: <span class=\"meta-yes\">YES</span>" + sourceTag);
+				    }
 				} else {
-					metaParts.add("Peer-Reviewed: <span class=\"meta-no\">NO</span>");
+				    String sourceTag = ref.vr.verificationSource() != null ? " <i>(" + ref.vr.verificationSource() + ")</i>" : "";
+				    metaParts.add("Peer-Reviewed: <span class=\"meta-no\">NO</span>" + sourceTag);
 				}
 
 				int cit = ref.vr.citationCount();

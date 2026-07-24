@@ -21,7 +21,8 @@ public class ResearchContext {
     private final String language;
     private final String rawInput;
     private final List<UploadedFile> files;
-
+    private final String internalLanguage; 
+    
     // Global, thread-safe databases for the current job
     private final Map<String, ValidatedResult> paperDatabase = new ConcurrentHashMap<>();
     private final Set<String> usedPaperIds = ConcurrentHashMap.newKeySet();
@@ -29,15 +30,17 @@ public class ResearchContext {
 
     private String coreIdea;
 
-    public ResearchContext(String jobId, String language, String rawInput, List<UploadedFile> files) {
-        this.jobId = jobId;
+    public ResearchContext(String jobId, String language, String internalLanguage, String rawInput, List<UploadedFile> files) {
+    	this.jobId = jobId;
         this.language = language;
+        this.internalLanguage = internalLanguage; 
         this.rawInput = rawInput;
         this.files = files;
     }
 
     public String getJobId() { return jobId; }
     public String getLanguage() { return language; }
+    public String getInternalLanguage() { return internalLanguage; } 
     public String getRawInput() { return rawInput; }
     public List<UploadedFile> getFiles() { return files; }
     

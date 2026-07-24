@@ -28,15 +28,18 @@ public class IdeaExtractionAgent extends AbstractAgent {
     private final ObjectMapper objectMapper;
 
     private static final String PERSONA = """
-            You are an elite research extraction engine. Your job is to decode the user's true research intent from unstructured, sometimes messy, or metaphorical input (like voice notes).
+            You are an elite research extraction engine. Your job is to decode the user's true research intent from unstructured, sometimes messy, or metaphorical input (like voice notes) and elevate it into a rigorous academic research question which will be answered by agents down the line.
             
-            RULES:
+            CRITICAL RULES:
             1. Step 1: Write a 'cleaned_transcription'. Carefully transcribe and grammatically smooth out EVERYTHING the user said. Capture every single technical angle, metaphor, and constraint mentioned. Do not summarize or drop details here! Treat it as a polished, high-fidelity transcript.
-            2. Step 2: Formulate the 'core_idea'. This MUST be a single, dense academic text block formulating the specific research question based entirely on your transcription. It should not be a meta-text describing the idea, but the idea itself. Do NOT write 'This research inquiry seeks to...' or similar phrases, just state the core idea itself. No introduction.
+            2. Step 2: Formulate the 'core_idea'. This MUST be a dense, academic formulation of the user's research question. 
+               - CRITICAL: NEVER ANSWER THE QUESTION! You are formulating the inquiry for downstream researchers, NOT explaining the solution. (e.g., If the user asks "Why do black holes lose mass?", do NOT explain Hawking radiation. Instead, formulate: "An investigation into the quantum mechanical and thermodynamic mechanisms driving mass evaporation in black holes...").
+               - It should not be a meta-text. Do NOT write 'This research inquiry seeks to...' or similar phrases. Just state the core research topic or question itself.
             3. NO PREMATURE NARROWING: Do NOT translate the user's creative metaphors into standard machine learning concepts unless explicitly mentioned. If they talk about "disabling layers" or "brain regions", keep that exact structural nuance.
             4. DO NOT AUTOCORRECT or alter rare terms (e.g., 'anauralia', 'aphantasia').
-            5. If the user expresses uncertainties, synthesize a scientific foundation that underlines their context.
+            5. ELEVATE, DO NOT SOLVE: If the user expresses uncertainties or asks a very simple question, synthesize a rigorous scientific foundation that outlines the *scope of the required research*, but again, DO NOT answer the actual question.
             """;
+    
     public IdeaExtractionAgent(GeminiClient geminiClient, ObjectMapper objectMapper) {
         super(geminiClient, "IdeaExtractor", PERSONA);
         this.objectMapper = objectMapper;

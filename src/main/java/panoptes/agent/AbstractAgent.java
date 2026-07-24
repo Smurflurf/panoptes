@@ -2,6 +2,8 @@ package panoptes.agent;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 
@@ -9,6 +11,9 @@ import panoptes.llm.GeminiClient;
 
 public abstract class AbstractAgent {
 
+    @Value("${panoptes.llm.internal-language:Scientific English}")
+    private String internalLanguage;
+	
     protected final GeminiClient geminiClient;
     protected final String agentName;
     protected final String persona;
@@ -37,15 +42,16 @@ public abstract class AbstractAgent {
 		String targetLang = (language == null || language.isBlank()) ? "English" : language;
 
 		finalPrompt += "\n\n--- GLOBAL ENCODING & LANGUAGE RULES ---\n"
-				+ "1. CRITICAL RULE: You MUST write your ENTIRE output (except for exact quotes) in " + targetLang + "!\n"
-				+ "2. Do not switch languages even if the source material is in another language.\n"
-				+ "3. MARKDOWN & KATEX: The output will be rendered using standard Markdown and KaTeX. \n"
-				+ "   - Use standard UTF-8 characters for all regular text and umlauts (e.g., ä, ö, ü).\n"
-				+ "   - Use '$' (inline) and '$$' (block) STRICTLY and EXCLUSIVELY for mathematical formulas and equations (e.g., $O(n^2)$).\n"
-				+ "   - Never use '$' as a replacement for letters in regular words.";
-
+				+ "1. PRIMARY LANGUAGE: You MUST write your ENTIRE output (except for exact quotes) in " + targetLang.toUpperCase() + "!\n"
+				+ "2. FIELD-SPECIFIC OVERRIDES: If your specific instructions require certain JSON fields (e.g., 'vector_query' or 'instructions') to be in "+ internalLanguage +", you MUST strictly obey those field-level language rules. Everything else defaults to " + targetLang.toUpperCase() + ".\n"
+				+ "3. SOURCE MATERIAL: Maintain the target language even if the source material is in another language.\n"
+				+ "4. MARKDOWN, KATEX & ENCODING: The output will be rendered using standard Markdown and KaTeX.\n"
+				+ "   - Write all regular text and special characters (like ä, ö, ü, ß) in standard raw UTF-8.\n"
+				+ "   - Output raw text directly. Avoid URL encoding (like %C3) or double-percents (like %%).\n"
+				+ "   - Use '$' (inline) and '$$' (block) strictly to wrap mathematical formulas and equations.";
+		
 		System.out.println("[" + agentName + "] is pondering...");
-		return geminiClient.ponder(persona, finalPrompt, attachments, schema);
+		return geminiClient.ponder(agentName, persona, finalPrompt, attachments, schema);
 	}
     
     public String getAgentName() {

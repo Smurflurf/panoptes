@@ -16,5 +16,6 @@ public record ValidatedResult(
         boolean isPeerReviewed,
         int citationCount,
         boolean isRetracted,
-        Integer publicationYear 
+        Integer publicationYear,
+        String verificationSource
 ) {}

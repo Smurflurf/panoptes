@@ -1,11 +1,11 @@
 package panoptes.agent;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -30,6 +30,8 @@ import panoptes.llm.GeminiClient;
  */
 @Service
 public class RankingAgent extends AbstractAgent {
+    
+    private static final Logger log = LoggerFactory.getLogger(RankingAgent.class);
     private final ObjectMapper mapper;
 
     public RankingAgent(GeminiClient geminiClient, ObjectMapper mapper) {
@@ -52,37 +54,38 @@ public class RankingAgent extends AbstractAgent {
     }
 
     public List<RankEvaluation> rankWithValidation(String question, List<ValidatedResult> results, String language) {
-        if (results == null || results.isEmpty())
+        if (results == null || results.isEmpty()) {
             return List.of();
+        }
 
         StringBuilder prompt = new StringBuilder("Research Question: " + question + "\n\nCandidates:\n");
         
-        // 1. Setup for a 'hard schema'
-        Map<String, Schema> dynamicProperties = new HashMap<>();
-        List<String> requiredIds = new ArrayList<>();
-
         for (ValidatedResult v : results) {
             DetailedResult r = v.originalResult();
-            String id = r.id();
             
             // Fill the prompt with all information of a paper
-            prompt.append("ID: ").append(id).append("\n")
+            prompt.append("ID: ").append(r.id()).append("\n")
                   .append("Title: ").append(r.title()).append("\n")
                   .append("Year: ").append(v.publicationYear() != null ? v.publicationYear() : "Unknown").append("\n")
                   .append("Peer Reviewed: ").append(v.isPeerReviewed() ? "YES" : "NO (Preprint)").append("\n")
                   .append("Citation Count: ").append(v.citationCount()).append("\n")
                   .append("Abstract: ").append(r.summary()).append("\n\n");
-
-            // 2. Put the papers ID as a hard key into the schema
-            dynamicProperties.put(id, Schema.builder().type(Known.INTEGER).description("Score from 0 to 100").build());
-            requiredIds.add(id);
         }
 
-        // 3. Build the json
+        // 1. Setup a stable ARRAY schema.
+        Schema itemSchema = Schema.builder()
+            .type(Known.OBJECT)
+            .properties(Map.of(
+                "id", Schema.builder().type(Known.STRING).build(),
+                "score", Schema.builder().type(Known.INTEGER).description("Score from 0 to 100").build()
+            ))
+            .required(List.of("id", "score"))
+            .build();
+
+        // 2. Build the JSON Array schema
         Schema jsonSchema = Schema.builder()
-                .type(Known.OBJECT)
-                .properties(dynamicProperties)
-                .required(requiredIds) // Require all IDs! -> No hallucinated IDs
+                .type(Known.ARRAY)
+                .items(itemSchema)
                 .build();
 
         String sysPrompt = """
@@ -91,21 +94,22 @@ public class RankingAgent extends AbstractAgent {
                 1. BE CRITICAL OF PEER REVIEW & AGE: A 'Peer Reviewed: YES' flag is a good baseline, but it does NOT guarantee high quality! If a paper is older than 10 years and has less than 5 citations, heavily PENALIZE its score (drop it to the 10-30 range), unless it is the ONLY paper answering the prompt. Always consider the publication year!
                 2. PREPRINTS NEED CITATIONS: If a paper is 'NO (Preprint)', it MUST have a high 'Citation Count' to be trusted.
                 3. SERENDIPITY: Papers from different fields are allowed if concepts are transferable.
-                4. EXHAUSTIVE SCORING: You must provide a score for EVERY single ID.
+                4. EXHAUSTIVE SCORING: You must provide an object containing 'id' and 'score' for EVERY single candidate.
                 """;
         
         String json = executePonder(sysPrompt + "\n\n" + prompt.toString(), null, jsonSchema, language);
 
         try {
-            // Read the json: { "ID-1": 85, "ID-2": 30, ... }
-            Map<String, Integer> scoreMap = mapper.readValue(json, new TypeReference<Map<String, Integer>>() {});
+            // Parse the array of objects: [ {"id": "-123...", "score": 85}, ... ]
+            List<Map<String, Object>> parsedList = mapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
             
-            return scoreMap.entrySet().stream()
-                    .map(entry -> new RankEvaluation(entry.getKey(), entry.getValue()))
+            return parsedList.stream()
+                    .map(map -> new RankEvaluation(String.valueOf(map.get("id")), ((Number) map.get("score")).intValue()))
                     .collect(Collectors.toList());
                     
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse RankingAgent response", e);
+            log.error("CRITICAL PARSE ERROR IN RANKING AGENT! Raw JSON was:\n{}", json, e);
+            return List.of(); 
         }
     }
     
